@@ -1,0 +1,105 @@
+
+</!DOCTYPE html>
+<html>
+<head>
+	<title>Sample Wallet Dapp</title>
+	<script src="web3.js/dist/web3.min.js"></script>
+	<script type="text/javascript">
+
+		//Setup Default 
+		if (typeof web3 !== 'undefined') {
+		  web3 = new Web3(web3.currentProvider);
+		  console.log("Default provider set");
+		} else {
+		  // set the provider you want from Web3.providers
+		  web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+		  console.log("No default provider found. Setting using http://localhost:8545");	  
+		}
+
+
+		//CONTRACT CONFIG: SampleWallet
+		var contract_address = "0xd3e658998EF20eB34FdD8586c490CB7dC1F096e7";
+		var contract_abi= [{"constant":true,"inputs":[],"name":"getBalance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"newValue","type":"uint256"}],"name":"updateBalance","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"inputs":[],"payable":true,"stateMutability":"payable","type":"constructor"}]
+
+		//USING CONTRACT: SampleWallet
+		
+		//get contract reference
+		var contract_instance = web3.eth.contract(contract_abi).at(contract_address);
+		
+		function getWalletBalance(){
+			//Calling contract constant function. No transaction needed.
+			document.getElementById("walletBalance").innerText = contract_instance.getBalance().toNumber();
+		}
+		
+		//calling transaction function
+		function updateBalance(){
+			
+			//Two things need to happen when calling a transaction function:
+			// 1. Unlock account 
+			// 2. Handle the cb for mining completion.
+
+			var currentNumber = contract_instance.getBalance().toNumber();
+			currentNumber++;
+
+			//unlock the executing account - needed to execute a transaction function.
+			web3.personal.unlockAccount(web3.eth.accounts[0], "_blockchain01");
+			
+						
+			//*** transaction function
+			var funcName = 'updateBalance'
+			contract_instance[funcName](currentNumber, {from: web3.eth.accounts[0], gas: 40000}, function(error, result){
+				if (error) {
+					console.log(error);
+				}else{
+					//result - transaction hash.
+					console.log(result)
+					var txHash = result;
+					callWhenMined(txHash, function(){
+						console.log("Data mined!!!");
+					});
+				}
+			} );
+		}
+		//getTransactionReceipt - check if a transaction was mined.
+		function callWhenMined(txHash, cb){
+				web3.eth.getTransactionReceipt(txHash, function(error, result){
+
+					if (error) {
+						console.log("error on receipt")
+					}else{
+						if (result === null) {
+							console.log("not mined!");
+							setTimeout(function(){
+								callWhenMined(txHash, cb);
+							}, 500);
+						}
+						else{
+							cb();
+						}
+					}
+				})
+		}
+
+		function getAccountBalance(){
+			//using the web3 api to perform actions.
+			document.getElementById("accountBalance").innerText = web3.fromWei(web3.eth.getBalance(web3.eth.accounts[0]),"ether");
+		}
+		
+
+	</script>
+</head>
+<body>
+<div>
+	<h1>This is my balance</h1>
+	<button onclick="getAccountBalance()">Get account balance</button>
+	<span id="accountBalance"></span> in Ether
+</div>
+<div>
+	<h1>Interact with contract</h1>
+	<button onclick="getWalletBalance()">Get Wallet Balance</button>
+	<button onclick="updateBalance()">Update Wallet Balance</button>
+
+	<span>Counter value is: <span id="walletBalance"></span></span>
+</div>
+</body>
+</html>
